@@ -28,7 +28,6 @@ func action(walls: Array[PackedVector2Array], gems: Array[Vector2],
 	
 	var containing_polygon:int = find_containing_polygon(polygons, ship_position)
 	
-	
 	debug_path.clear_points()
 	if(containing_polygon >= 0):
 		add_polygon_to_path(polygons[containing_polygon])
@@ -39,8 +38,8 @@ func _ready() -> void:
 	
 	var heap := BinaryHeap.new(func(a:int, b:int): return b-a)
 	
-	for i in range(10000):
-		heap.push(Random.randi_range(0, 9999))
+	for i in range(100000):
+		heap.push(Random.randi_range(0, 99999))
 	
 	var last :int = 99999
 	while heap.size() > 0:
@@ -77,6 +76,8 @@ class BinaryHeap:
 			var son1 :int = 2*i + 1
 			var son2 :int = 2*i + 2
 			var chosen_son = son1 if (son2 >= _data.size() || _comparator.call(_data[son1], _data[son2]) <= 0) else son2
+			if _comparator.call(_data[i], _data[chosen_son]) < 0 : 
+				break
 			_swap(_data, i, chosen_son)
 			i = chosen_son
 		return i
@@ -90,11 +91,9 @@ class BinaryHeap:
 		
 	func pop():
 		var ret = _data[0]
-		var i :=_bubble_down(0)
-		if i != (_data.size() - 1):
-			_data[i] = _data[_data.size()-1]
-			_bubble_up(i)
+		_data[0] = _data[_data.size()-1]
 		_data.remove_at(_data.size()-1)
+		_bubble_down(0)
 		return ret 
 		
 	func push(item)->void:
