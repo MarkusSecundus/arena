@@ -1,5 +1,8 @@
 class_name AStar
-
+"""
+Implementation of full-fledged AStar algorithm, although in practice it's used mostly just as glorified BFS.
+I was lazy so I pretty much just copypasted the implementation that I wrote and tested last year for Artifical Inteligence 1. 
+"""
 
 class AStarSolution:
     var actions_sequence: Array

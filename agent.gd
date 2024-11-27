@@ -42,51 +42,14 @@ func action(walls: Array[PackedVector2Array], gems: Array[Vector2], polygons: Ar
     var containing_polygon:int = find_containing_polygon(polygons, ship_position)
     
     debug_path.clear_points()
-    #var containing_polys : PackedInt32Array = []
-    #find_containing_polygons(containing_polys, polygons, ship_position, 0.04)
-    #for p in containing_polys: add_polygon_to_path(polygons[p])
     
     var path:= find_path_to_nearest_gem(ctx)
-    #path = simplify_path(ctx, path)
     debug_path.add_point(ship_position)
     for segment in path: debug_path.add_point(segment)
     return steer_to_destination(path[0])
 
 
 
-
-
-
-class ArenaProblem:
-    extends AStar.HeuristicProblem
-    var _ctx : AgentActionContext
-    var _initial_position : Vector2
-    func _init(initial_position:Vector2, ctx:AgentActionContext) -> void:
-        _initial_position = initial_position
-        _ctx = ctx
-    
-    
-    func initial_state():return _initial_position
-    
-    func actions(state:Vector2)->Array:
-        var ret:Array[Vector2] = []
-        var polys : PackedInt32Array = []
-        ArenaAgent.find_containing_polygons(polys, _ctx.polygons , state, 0.04)
-        for poly in polys:
-            for gem in _ctx.polygons_to_gems[poly]:
-                ret.append(_ctx.gems[gem])
-            var i: int = 1
-            var current_polygon := _ctx.polygons[poly]
-            while i < current_polygon.size():
-                var  to_append:= (current_polygon[i-1] + current_polygon[i])*0.5
-                if state.distance_squared_to(to_append) > 0.5: ret.append(to_append)
-                i += 1
-        return ret
-    func cost(state:Vector2, action:Vector2)->float: return state.distance_to(action)
-    func result(state, action):return action
-    func estimate(state:Vector2)->float:
-        for g in _ctx.gems: if state.distance_squared_to(g) < 0.5: return 0
-        return 0.1
 
 class SimpleArenaProblem:
     extends AStar.HeuristicProblem
@@ -107,8 +70,9 @@ class SimpleArenaProblem:
     func cost(state:int, action:int)->float: return 1
     func result(state, action):return action
     func estimate(state:int)->float:
-        if _ctx.polygons_to_gems[state].size() > 0: return 0
-        return 0.1
+        # we are basically just using aStar to get behavior of bfs (ofc there was an attempt to do a proper aStar, but it didn't work in practice nearly as well as this simplistic approach) 
+        if _ctx.polygons_to_gems[state].size() > 0: return 0 # we reached a polygon that contains some gems
+        return 0.1 # must be non-zero - estimate=0 is interpreted as sign that we reached the goal state 
 
 
 func find_path_to_nearest_gem(ctx :AgentActionContext)->PackedVector2Array:
@@ -133,38 +97,13 @@ func find_path_to_nearest_gem(ctx :AgentActionContext)->PackedVector2Array:
 
 
 
-func simplify_path(ctx:AgentActionContext, path:PackedVector2Array)->PackedVector2Array:
-    var ret : PackedVector2Array = []
-    var current_pos : Vector2 = ship_position
-    var last_pos : Vector2 = ship_position
-    for v in path:
-        if find_intersecting_wall(current_pos, v, ctx) == -1:
-            continue
-        if last_pos != current_pos:
-            ret.append(last_pos)
-            current_pos = last_pos
-        last_pos = v
-    if ret.is_empty() || ret[ret.size()-1] != path[path.size()-1]: ret.append(path[path.size()-1])
-    return ret
-
-func find_intersecting_wall(begin:Vector2, end: Vector2, ctx:AgentActionContext)->int:
-    for wall_idx in range(ctx.walls.size()):
-        var wall := ctx.walls[wall_idx]
-        for i in range(1, wall.size()):
-            var intersection := get_line_intersection(begin, end, wall[i-1], wall[i])
-            if intersection[0] >= 0.0 && intersection[0] <= 1.0 && intersection[1] >= 0.0 && intersection[1] <= 1.0:
-                return wall_idx
-        pass
-    return -1
-
 func steer_to_destination(destination: Vector2):
     
     var distance := destination - ship_position
     var velocity_distance := distance - ship_velocity
     var target_rotation := atan2(velocity_distance.y, velocity_distance.x)
     var rotation_distance := normalize_radians(target_rotation - ship_rotation)
-    #rotation_distance = get_min([rotation_distance, rotation_distance+360, rotation_distance-360], func(d:float)->float:return abs(d))
-    print("rotation_distance: {0}".format([rotation_distance]))
+    print("rotation_distance: {0}".format([rotation_distance/PI*180]))
     
     return make_action(sign(rotation_distance), abs(rotation_distance) < 0.2)
 
@@ -183,9 +122,6 @@ static func report_error(message: String)->void:
     push_error(message)
     
 
-func add_polygon_to_path(polygon : PackedVector2Array):
-        for p in polygon: debug_path.add_point(p)
-        debug_path.add_point(polygon[0])
 
 static func map_polygons_to_gems(gems_to_polygons: PackedInt32Array, polygons: Array[PackedVector2Array])->Array[PackedInt32Array]:
     var ret : Array[PackedInt32Array] = []
@@ -244,13 +180,6 @@ static func get_min(items: Array, estimate_selector: Callable):
 
 static func get_orthogonal(v:Vector2)->Vector2:
     return Vector2(-v.y, v.x)
-
-
-#this is broken (probably some typo) - DO NOT USE
-static func get_line_intersection(o1:Vector2, d1: Vector2, o2:Vector2, d2:Vector2)->Array[float]:
-    var t1:float = (d2.x*(o1.y - o2.y) - d2.y * o1.x + d2.y*o2.x)/(d2.y*d1.x - d2.x*d1.y)
-    var t2:float = (o1.x*d1.x*t1 - o2.x)/d2.x
-    return [t1, t2]
 
 
 func bounce():
