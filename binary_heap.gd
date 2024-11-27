@@ -2,11 +2,11 @@
 class_name BinaryHeap
 
 var _data : Array
-var _comparator : Callable
+var _less_then : Callable
 
-func _init(comparator : Callable) -> void:
+func _init(less_then : Callable) -> void:
     _data = []
-    _comparator = comparator
+    _less_then = less_then
 
 static func _swap(array : Array, i :int, j:int)->void:
     var tmp = array[i]
@@ -16,7 +16,7 @@ static func _swap(array : Array, i :int, j:int)->void:
 func _bubble_up(i:int)->int:
     while i != 0:
         var parent :int = int(floor((i-1) / 2))
-        if _comparator.call(_data[i], _data[parent]) >= 0: 
+        if ! _less_then.call(_data[i], _data[parent]): 
             break
         _swap(_data, i, parent)
         i = parent
@@ -25,8 +25,8 @@ func _bubble_down(i:int)->int:
     while 2*i + 1 < _data.size():
         var son1 :int = 2*i + 1
         var son2 :int = 2*i + 2
-        var chosen_son = son1 if (son2 >= _data.size() || _comparator.call(_data[son1], _data[son2]) <= 0) else son2
-        if _comparator.call(_data[i], _data[chosen_son]) < 0 : 
+        var chosen_son = son1 if (son2 >= _data.size() || _less_then.call(_data[son1], _data[son2])) else son2
+        if _less_then.call(_data[i], _data[chosen_son]) : 
             break
         _swap(_data, i, chosen_son)
         i = chosen_son
