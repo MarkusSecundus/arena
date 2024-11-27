@@ -47,9 +47,9 @@ func action(walls: Array[PackedVector2Array], gems: Array[Vector2], polygons: Ar
     #for p in containing_polys: add_polygon_to_path(polygons[p])
     
     var path:= find_path_to_nearest_gem(ctx)
+    #path = simplify_path(ctx, path)
     debug_path.add_point(ship_position)
     for segment in path: debug_path.add_point(segment)
-    
     return steer_to_destination(path[0])
 
 
@@ -116,38 +116,66 @@ func find_path_to_nearest_gem(ctx :AgentActionContext)->PackedVector2Array:
     var solution:= AStar.run_astar(arena_problem)
     if ! solution:
         print("NO SOLUTION!")
-        return [ctx.gems[0]]
+        return [get_min(ctx.gems, func(gem:Vector2)->float: return ship_position.distance_squared_to(gem))]
     
     var ret:= PackedVector2Array()
     var pos:= ship_position
     for poly in solution.actions_sequence:
         var new_pos :Vector2= Util.get_closest_point_on_polygon(pos, ctx.polygons[poly])
-        if pos.distance_squared_to(new_pos) < 50: continue
+        if pos.distance_squared_to(new_pos) < (ship.RADIUS*1.4)**2: continue
         ret.append(new_pos)
         pos=new_pos
     var end_polygon :int= arena_problem.initial_state() if solution.actions_sequence.is_empty() else solution.actions_sequence[solution.actions_sequence.size()-1]
-    ret.append(ctx.gems[ctx.polygons_to_gems[end_polygon][0]])
+    var nearest_gem : int = get_min(ctx.polygons_to_gems[end_polygon], func(gem:int)->float: return ship_position.distance_squared_to(ctx.gems[gem]))
+    ret.append( ctx.gems[nearest_gem])
     
     return ret
 
 
 
+func simplify_path(ctx:AgentActionContext, path:PackedVector2Array)->PackedVector2Array:
+    var ret : PackedVector2Array = []
+    var current_pos : Vector2 = ship_position
+    var last_pos : Vector2 = ship_position
+    for v in path:
+        if find_intersecting_wall(current_pos, v, ctx) == -1:
+            continue
+        if last_pos != current_pos:
+            ret.append(last_pos)
+            current_pos = last_pos
+        last_pos = v
+    if ret.is_empty() || ret[ret.size()-1] != path[path.size()-1]: ret.append(path[path.size()-1])
+    return ret
 
-
-
+func find_intersecting_wall(begin:Vector2, end: Vector2, ctx:AgentActionContext)->int:
+    for wall_idx in range(ctx.walls.size()):
+        var wall := ctx.walls[wall_idx]
+        for i in range(1, wall.size()):
+            var intersection := get_line_intersection(begin, end, wall[i-1], wall[i])
+            if intersection[0] >= 0.0 && intersection[0] <= 1.0 && intersection[1] >= 0.0 && intersection[1] <= 1.0:
+                return wall_idx
+        pass
+    return -1
 
 func steer_to_destination(destination: Vector2):
     
     var distance := destination - ship_position
     var velocity_distance := distance - ship_velocity
     var target_rotation := atan2(velocity_distance.y, velocity_distance.x)
-    var rotation_distance := target_rotation - ship_rotation
+    var rotation_distance := normalize_radians(target_rotation - ship_rotation)
+    #rotation_distance = get_min([rotation_distance, rotation_distance+360, rotation_distance-360], func(d:float)->float:return abs(d))
+    print("rotation_distance: {0}".format([rotation_distance]))
     
-    return make_action(sign(rotation_distance), abs(rotation_distance) < 0.1)
+    return make_action(sign(rotation_distance), abs(rotation_distance) < 0.2)
 
+static func normalize_radians(rad: float)->float:
+    const PI_DOUBLE = PI*2
+    rad = fmod(rad, PI_DOUBLE)
+    if rad > PI: rad -= PI_DOUBLE
+    elif rad < -PI: rad += PI_DOUBLE
+    return rad
 
-
-static func make_action(spin: int, thrust: bool, shoot:bool = false)->Array:
+static func make_action(spin: int, thrust: bool, shoot:bool = true)->Array:
     return [spin, thrust, shoot]
 
 static func report_error(message: String)->void:
@@ -204,11 +232,27 @@ static func polygon_contains_point(polygon : PackedVector2Array, point: Vector2,
         i+=1
     return true
 
+static func get_min(items: Array, estimate_selector: Callable):
+    var min_estimate :float= INF
+    var min_item = null
+    for item in items:
+        var current_estimate :float= estimate_selector.call(item)
+        if current_estimate < min_estimate:
+            min_estimate = current_estimate
+            min_item = item
+    return min_item
 
 static func get_orthogonal(v:Vector2)->Vector2:
     return Vector2(-v.y, v.x)
 
-# Called every time the agent has bounced off a wall.
+
+#this is broken (probably some typo) - DO NOT USE
+static func get_line_intersection(o1:Vector2, d1: Vector2, o2:Vector2, d2:Vector2)->Array[float]:
+    var t1:float = (d2.x*(o1.y - o2.y) - d2.y * o1.x + d2.y*o2.x)/(d2.y*d1.x - d2.x*d1.y)
+    var t2:float = (o1.x*d1.x*t1 - o2.x)/d2.x
+    return [t1, t2]
+
+
 func bounce():
     return
 

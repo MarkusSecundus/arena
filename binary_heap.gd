@@ -1,4 +1,5 @@
-
+# basic implementation of a binary heap, serialized into an array like in heapsort
+# provides standard push/pop/peek interface that one expects from a priority queue
 class_name BinaryHeap
 
 var _data : Array
